@@ -4,8 +4,12 @@ Read this before changing `AGENTS.md`, a component guide (`<dir>/AGENTS.md`) or 
 
 ## Size
 
-`AGENTS.md` loads on every agent request, a component guide when the agent enters that
-directory, a skill when it is used. Keep `AGENTS.md` under 200 lines, a component guide under
+`AGENTS.md` loads on every agent request. A component guide loads in Codex when the agent starts
+in that directory or below it, and in Claude Code, through the `CLAUDE.md` beside it, when the
+agent reads or edits a file in that directory; root `AGENTS.md` tells agents to read it before
+changing code there. A skill loads when it is used. Every `AGENTS.md` has a `CLAUDE.md` beside it
+holding the one line `@AGENTS.md`: Claude Code reads only `CLAUDE.md` files wherever a `CLAUDE.md`
+exists in the directory or above it. Keep `AGENTS.md` under 200 lines, a component guide under
 300 and a `SKILL.md` under 500. Over budget: split or remove; do not compress the prose.
 `tools/check_agent_files.py` checks these limits and runs in the test suite.
 
