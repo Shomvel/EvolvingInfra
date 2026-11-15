@@ -45,20 +45,29 @@ Python 3.11 or newer. Three Python environments exist in the runtime image becau
 dependencies conflict: the engine (system Python), `/opt/indexer-venv` (launcher, frontend, KV
 directory, planner) and `/opt/trie-venv` (replay client).
 
+Before pushing, run what CI runs ([`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the
+reference):
+
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[client,frontend,indexer,planner,test]"      # launcher, every Python component, test tools
-python -m pytest -q tests                                     # no GPU; tests that need decoupled-engine skip
-(cd evolving_infra/router/core && cargo test --locked)   # router: unit and proxy tests
+python tools/check_agent_files.py                              # AGENTS.md, CLAUDE.md, skills
+uv lock --check
+uv run --locked --extra client --extra frontend --extra indexer --extra planner --extra test \
+  pytest -q tests                                              # no GPU; tests that need decoupled-engine skip
+(cd evolving_infra/router/core && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings \
+  && cargo test --locked)                                      # router
 python3 -m venv .venv-trie && .venv-trie/bin/pip install -e 'benchmarks/trie[test]'
-.venv-trie/bin/python -m pytest -q benchmarks/trie/tests      # replay client
+.venv-trie/bin/python -m pytest -q benchmarks/trie/tests       # replay client
 ```
 
-GPU validation, smallest first:
+While iterating, run one test: `uv run ... pytest -q tests/<dir>/<file>.py -k <name>`, or
+`cargo test --locked <name>` in `evolving_infra/router/core`.
+
+GPU validation, smallest first, with the config of your hardware from [`examples/`](examples/README.md):
 
 ```bash
-evolving-infra serve --config examples/gb300/glm52-1node.yaml          # one node, 1P1D
-python examples/slurm/submit.py --account A --partition P --image IMG   # nine nodes, scored
+evolving-infra serve --config examples/gb300/glm52-1node.yaml          # one GB300 node, 1P1D
+evolving-infra serve --config examples/h200/dsv4-flash.yaml            # one H200 node, 1P1D
+python examples/slurm/submit.py --account A --partition P --image IMG   # nine GB300 nodes, scored
 ```
 
 Tests: extend the nearest existing test file; test behavior through public entry points; one
@@ -96,7 +105,9 @@ anything that depends on your model, GPU or cluster, the skill says how to work 
 
 ## 5. Component guides
 
-Read the guide of a directory before changing code in it. If the guide conflicts with the
+Read the guide of a directory before changing code in it: Codex loads only the guides from the
+repository root down to the directory it starts in, and Claude Code loads a guide (through the
+`CLAUDE.md` beside it) once it works on a file in that directory. If the guide conflicts with the
 requested change, stop and say so.
 
 - [`evolving_infra/engine/AGENTS.md`](evolving_infra/engine/AGENTS.md): resolved settings, where defaults live, ports, TP ranks.

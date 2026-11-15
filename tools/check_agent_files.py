@@ -10,7 +10,8 @@ differs from its directory or whose description lacks "Use when"; a skill whose 
 from skills/SKILL_TEMPLATE.md (Scope with Reads, Writes, Never changes and Outside the
 repository; Inputs; Steps numbered from 1, each with a Check line; Returns; optional Pitfalls);
 a path or link in a skill that does not exist; a skill without its line in AGENTS.md
-and in skills/README.md; CLAUDE.md, or the .claude/skills or .agents/skills link, missing.
+and in skills/README.md; a CLAUDE.md beside an AGENTS.md, or the .claude/skills or .agents/skills
+link, missing.
 Standard library only.
 """
 import argparse
@@ -75,9 +76,13 @@ def problems() -> list:
     for guide in tracked("*/AGENTS.md") + tracked("**/AGENTS.md"):
         if guide != root and lines(guide) > BUDGET["guide"]:
             found.append(f"{guide.relative_to(ROOT)} has {lines(guide)} lines (limit {BUDGET['guide']})")
-    claude = ROOT / "CLAUDE.md"
-    if not claude.exists() or claude.read_text().strip() != "@AGENTS.md":
-        found.append("CLAUDE.md must hold the one line @AGENTS.md, so Claude Code reads AGENTS.md")
+    # Claude Code reads only CLAUDE.md wherever a CLAUDE.md exists above the working directory, so
+    # every AGENTS.md needs a CLAUDE.md beside it that imports it.
+    for guide in [root] + sorted({g for g in tracked("*/AGENTS.md") + tracked("**/AGENTS.md")} - {root}):
+        claude = guide.parent / "CLAUDE.md"
+        if not claude.exists() or claude.read_text().strip() != "@AGENTS.md":
+            where = claude.relative_to(ROOT)
+            found.append(f"{where} must hold the one line @AGENTS.md, so Claude Code reads the AGENTS.md beside it")
     for link, agent in ((".claude/skills", "Claude Code"), (".agents/skills", "Codex")):
         path = ROOT / link
         if not path.is_symlink() or path.resolve() != (ROOT / "skills").resolve():
