@@ -30,7 +30,7 @@
 
 ---
 
-https://github.com/user-attachments/assets/d158ee7e-d554-47f0-a40f-1db343a6cf91
+https://github.com/user-attachments/assets/275e72b3-32a8-4917-b4ee-2083b10027bf
 
 Evolving Infra is an LLM serving system that adapts itself to the agent workload **purely online**,
 with **no offline profiling**. Serving coding, math and computer-use agents with GLM-5.2 and Kimi K2.6
