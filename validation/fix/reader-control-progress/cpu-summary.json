@@ -1,0 +1,65 @@
+{
+  "base_commit": "738f586b9d0135cd51dba6b267d7962134478c7b",
+  "environment": {
+    "provider": "E2B",
+    "template_id": "vshaqeiaoi96u3cp66t3",
+    "template_alias": "flasheda-r5-cpu8-t16-20261030",
+    "sandbox_id": "i2rp9jv8cwlnvjjcdhcon",
+    "cpu_count": 8,
+    "memory_mib": 16016,
+    "python": "3.12.3",
+    "uv": "0.13.8"
+  },
+  "input_sha256": {
+    "base_archive_sha256": "7e30e6c1376ad530f263a81c13a420e8790a28cca6d2d89af577354e8264a7a2",
+    "base_red_candidate_patch_sha256": "605eda5f342e7a90945538376d71c1315e917842b1058649d681c9856176d9db",
+    "tests_only_patch_sha256": "25a211d90742b162cdfca3064e70a632c6d890a1b6578f40a130927cb1570a44",
+    "implementation_patch_sha256": "64110ceedd8bd67b6ee706881ee6fc6a3392e231ddd18b5c13228d0bb86e9d73",
+    "final_test_sha256": "c611eb5495576736bfdca3b26b78f229d7e4fc6ea82be5bc4ce37a30db065c75",
+    "candidate_uv_lock_sha256": "03fa9fa50f1dad2c8983a147b61fa22293d1f12990e691dd3a2a4547fa6838be",
+    "evidence_bundle_sha256": "e39ba9a7995fc8e4e396d3d3e5da97e2ac050a654021c42da4f6f1f5405773fe"
+  },
+  "validation": [
+    {
+      "command": "uv run --locked --extra client --extra frontend --extra indexer --extra planner --extra test pytest -q tests/engine/test_pull_reader.py",
+      "implementation": "base 738f586; added initial regression tests only",
+      "exit_code": 1,
+      "result": "2 failed, 2 passed in 6.22s",
+      "failure_reason": "Blocked destination page lookup prevented DONE for a second independent transfer. The removed thread-name assertion was later in the second test and did not cause either failure."
+    },
+    {
+      "command": "uv lock --check",
+      "implementation": "final candidate",
+      "exit_code": 0,
+      "result": "Resolved 81 packages; lock current"
+    },
+    {
+      "command": "uv run --locked --extra client --extra frontend --extra indexer --extra planner --extra test pytest -q tests/engine",
+      "implementation": "final candidate",
+      "exit_code": 0,
+      "result": "18 passed in 0.12s"
+    },
+    {
+      "command": "uv run --locked --extra client --extra frontend --extra indexer --extra planner --extra test pytest -q tests",
+      "implementation": "final candidate",
+      "exit_code": 0,
+      "result": "452 passed, 6 skipped, 1 warning, 55 subtests passed in 46.36s"
+    },
+    {
+      "command": "uv run --locked python tools/check_agent_files.py",
+      "implementation": "final candidate",
+      "exit_code": 0,
+      "result": "Passed; no findings"
+    }
+  ],
+  "full_python_warning": "aiohttp NotAppKeyWarning in unchanged tests/indexer/test_query.py",
+  "not_run": [
+    "Router Rust compilation/tests: no router change",
+    "Trie replay-client tests: no trie change"
+  ],
+  "sandbox_released": true,
+  "sandbox_release_unix_s": 1794884538.3608322,
+  "evidence_directory": "e2b-artifacts/e2b",
+  "evidence_bundle_sha256": "e39ba9a7995fc8e4e396d3d3e5da97e2ac050a654021c42da4f6f1f5405773fe",
+  "candidate_commit": "f2cbd744d4aeb917b3698475854aeda179acad60"
+}

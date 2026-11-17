@@ -1,0 +1,151 @@
+25a211d90742b162cdfca3064e70a632c6d890a1b6578f40a130927cb1570a44  /workspace/ei-reader-validation/tests-only.patch
+
+F
+F
+.
+.
+                                                                     [100%]
+
+=================================== FAILURES ===================================
+____________ test_blocked_page_lookup_does_not_stall_another_import ____________
+
+kind = 'DONE', transfer = 2
+
+    def receive(kind, transfer):
+        while True:
+            try:
+>               message = wire.decode(owner.recv())
+                                      ^^^^^^^^^^^^
+
+tests/engine/test_pull_reader.py:93: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+zmq/backend/cython/_zmq.py:1218: in zmq.backend.cython._zmq.Socket.recv
+    def recv(self, flags=0, copy: bint = True, track: bint = False):
+    ^^^^^^^^^^^
+zmq/backend/cython/_zmq.py:1253: in zmq.backend.cython._zmq.Socket.recv
+    return _recv_copy(self.handle, flags)
+    ^^^^^^^^^^^
+zmq/backend/cython/_zmq.py:1413: in zmq.backend.cython._zmq._recv_copy
+    raise
+zmq/backend/cython/_zmq.py:1408: in zmq.backend.cython._zmq._recv_copy
+    _check_rc(rc)
+    ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   raise Again(errno)
+    ^^^^^^^^^^^
+E   zmq.error.Again: Resource temporarily unavailable
+
+zmq/backend/cython/_zmq.py:186: Again
+
+During handling of the above exception, another exception occurred:
+
+channel = namespace(reader=<decoupled_engine.srt.disaggregation.pull.importer.ReaderPlane object at 0x7f6f15c06090>, wire=<modul...00>, receive=<function channel.<locals>.receive at 0x7f6f15cb3880>, release=<threading.Event at 0x7f6f15c05b20: unset>)
+
+    def test_blocked_page_lookup_does_not_stall_another_import(channel):
+        c = channel
+        entered = threading.Event()
+    
+        def blocked(chunk):
+            entered.set()
+            assert c.release.wait(10), "page lookup was not released"
+            return {"full": [0]}
+    
+        c.begin(1, blocked)
+        c.chunk(1)
+        assert entered.wait(3)
+        c.final(1)
+        c.begin(2, lambda chunk: {"full": [1]})
+        c.chunk(2)
+        c.final(2)
+>       c.receive(c.wire.MSG_DONE, 2)
+
+tests/engine/test_pull_reader.py:128: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+kind = 'DONE', transfer = 2
+
+    def receive(kind, transfer):
+        while True:
+            try:
+                message = wire.decode(owner.recv())
+            except zmq.Again:
+>               pytest.fail(f"reader did not send {kind} for transfer {transfer}")
+E               Failed: reader did not send DONE for transfer 2
+
+tests/engine/test_pull_reader.py:95: Failed
+__________ test_owner_abort_waits_for_page_lookup_and_skips_the_read ___________
+
+kind = 'DONE', transfer = 2
+
+    def receive(kind, transfer):
+        while True:
+            try:
+>               message = wire.decode(owner.recv())
+                                      ^^^^^^^^^^^^
+
+tests/engine/test_pull_reader.py:93: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+zmq/backend/cython/_zmq.py:1218: in zmq.backend.cython._zmq.Socket.recv
+    def recv(self, flags=0, copy: bint = True, track: bint = False):
+    ^^^^^^^^^^^
+zmq/backend/cython/_zmq.py:1253: in zmq.backend.cython._zmq.Socket.recv
+    return _recv_copy(self.handle, flags)
+    ^^^^^^^^^^^
+zmq/backend/cython/_zmq.py:1413: in zmq.backend.cython._zmq._recv_copy
+    raise
+zmq/backend/cython/_zmq.py:1408: in zmq.backend.cython._zmq._recv_copy
+    _check_rc(rc)
+    ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   raise Again(errno)
+    ^^^^^^^^^^^
+E   zmq.error.Again: Resource temporarily unavailable
+
+zmq/backend/cython/_zmq.py:186: Again
+
+During handling of the above exception, another exception occurred:
+
+channel = namespace(reader=<decoupled_engine.srt.disaggregation.pull.importer.ReaderPlane object at 0x7f6f15b51970>, wire=<modul...20>, receive=<function channel.<locals>.receive at 0x7f6f15cc67a0>, release=<threading.Event at 0x7f6f15b50320: unset>)
+
+    def test_owner_abort_waits_for_page_lookup_and_skips_the_read(channel):
+        c = channel
+        entered = threading.Event()
+        callback_thread = []
+    
+        def blocked(chunk):
+            callback_thread.append(threading.current_thread())
+            entered.set()
+            assert c.release.wait(10), "page lookup was not released"
+            return {"full": [0]}
+    
+        c.begin(1, blocked)
+        c.chunk(1)
+        assert entered.wait(3)
+        c.send(c.wire.make_abort(transfer_id=1, attempt_id=1, reason="cancelled"))
+        # A later completed transfer is a channel barrier for the preceding ABORT.
+        c.begin(2, lambda chunk: {"full": [1]})
+        c.chunk(2)
+        c.final(2)
+>       c.receive(c.wire.MSG_DONE, 2)
+
+tests/engine/test_pull_reader.py:156: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+kind = 'DONE', transfer = 2
+
+    def receive(kind, transfer):
+        while True:
+            try:
+                message = wire.decode(owner.recv())
+            except zmq.Again:
+>               pytest.fail(f"reader did not send {kind} for transfer {transfer}")
+E               Failed: reader did not send DONE for transfer 2
+
+tests/engine/test_pull_reader.py:95: Failed
+=========================== short test summary info ============================
+FAILED tests/engine/test_pull_reader.py::test_blocked_page_lookup_does_not_stall_another_import
+FAILED tests/engine/test_pull_reader.py::test_owner_abort_waits_for_page_lookup_and_skips_the_read
+2 failed, 2 passed in 6.22s
+

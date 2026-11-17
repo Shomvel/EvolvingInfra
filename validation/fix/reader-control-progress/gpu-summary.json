@@ -1,0 +1,187 @@
+{
+  "passed": true,
+  "source": {
+    "base_snapshot": "2b53f6a26e72648cc7f9663d84fe69efb676ddf8",
+    "candidate_commit": "f2cbd744d4aeb917b3698475854aeda179acad60",
+    "overlay": [
+      {
+        "path": "evolving_infra/engine/decoupled_engine/srt/disaggregation/pull/api.py",
+        "base_sha256": "f2c5a022c93552f74321f6c55ea0cb03c7a7a0e800a6ba5c360bbf14f81f2a4c",
+        "sha256": "7d3d5bbd3cd6336af44d2325530259991d0eed7da8f9d0003030d2199b6e35cb"
+      },
+      {
+        "path": "evolving_infra/engine/decoupled_engine/srt/disaggregation/pull/importer.py",
+        "base_sha256": "c1173d010a277274a79e40f8e39eb8874f04f010d8f65d63b5c9b99410269d4b",
+        "sha256": "f0f4066310c26ddb22d2a8c125ef3f9bde86cc6e1c2970db6fc60b84f07ce2ca"
+      },
+      {
+        "path": "evolving_infra/engine/decoupled_engine/srt/disaggregation/symmetric/import_queue.py",
+        "base_sha256": "dd456cbfdeba8203013a5b5cf07422aa74b77f6a707c55a9a3d56a38c31f3cbc",
+        "sha256": "5be22594779df036233360d4e9d47f7d6113af574c6ca910180e7f0cc88fa569"
+      }
+    ],
+    "baseline_mha_stride_patch": {
+      "name": "mha-page-stride",
+      "upstream_commit": "738f586b9d0135cd51dba6b267d7962134478c7b",
+      "parent_snapshot_commit": "12df53ec256b0aefeb6e206eb904b4eb9f87818f",
+      "artifacts": {
+        "mha-page-stride.patch": "5da49fc67dbe8457cab5012c685a4cdf8ab40adc5c423c470af05bff14ed0415",
+        "export_table.py": "74e2b42677668132d04658cf63c3a9090cf8c2d6c7ab790ce63a8318e5c9f9c0"
+      },
+      "qualification": {
+        "native_copy_cases": 24,
+        "passed": true,
+        "qwen3_1024_kv_bytes": 150994944,
+        "qwen3_page_bytes_per_layer_k_or_v": 131072,
+        "scope": "native descriptor, registration and bounded CPU copies; GPU not claimed"
+      }
+    }
+  },
+  "model": "Qwen3-4B BF16",
+  "gpus": "2x NVIDIA H200",
+  "tp": 1,
+  "split": "1P1D",
+  "transport": "Mooncake RDMA",
+  "completed_requests": 8,
+  "cancelled_streams": 1,
+  "concurrent_requests": 4,
+  "prefix_reused_tokens": 4096,
+  "requests": [
+    {
+      "branch": 0,
+      "turn": 1,
+      "prompt_tokens": 4096,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 0
+    },
+    {
+      "branch": 0,
+      "turn": 2,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 1,
+      "turn": 1,
+      "prompt_tokens": 4096,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4032
+    },
+    {
+      "branch": 2,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 4,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 3,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 5,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 6,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 4096,
+      "output_tokens": 1,
+      "cancelled_after_first_output": true,
+      "terminal": false,
+      "done": false,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    },
+    {
+      "branch": 7,
+      "turn": 1,
+      "prompt_tokens": 4224,
+      "max_new_tokens": 32,
+      "output_tokens": 32,
+      "cancelled_after_first_output": false,
+      "terminal": true,
+      "done": true,
+      "prompt_echo_matches": true,
+      "cached_tokens": 4096
+    }
+  ],
+  "final_worker_import_count": [
+    0,
+    0
+  ],
+  "final_worker_export_count": [
+    0,
+    0
+  ],
+  "platform_job_state": "Succeeded",
+  "platform_replica_states": [
+    "Succeeded"
+  ],
+  "gpu_memory_used_mib_after": [
+    0,
+    0
+  ],
+  "control_progress_sample": {
+    "first_chunk_recv_at": 1794883876.9185169,
+    "final_recv_at": 1794883876.9317908,
+    "first_read_start_at": 1794883877.2830203
+  },
+  "raw_receipt_sha256": "661f5729e1b88c87d9f77c1c659bf0ca545f3dc4e2e7015dadc16f5a35b96567",
+  "caveats": [
+    "Separate MHA page-stride compatibility patch retained in this GPU environment.",
+    "Cancellation after decode start; CPU regression covers cancellation during blocked lookup.",
+    "Outer serve exited 0 without harness force-kill; engine shutdown used SIGQUIT cleanup.",
+    "No throughput comparison, multiple TP ranks, DSA or multi-node validation."
+  ]
+}

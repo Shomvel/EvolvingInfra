@@ -1,0 +1,16 @@
+--- a/evolving_infra/engine/decoupled_engine/srt/disaggregation/symmetric/export_table.py
++++ b/evolving_infra/engine/decoupled_engine/srt/disaggregation/symmetric/export_table.py
+@@ -241,8 +241,11 @@
+                 + list(kv_args.state_item_lens[i]),
+             )
+         }
+-    if any(cls.__name__ == "MLATokenToKVPool" for cls in type(kvcache).__mro__):
+-        # Native MLA buffer descriptors already use bytes per allocator page.
++    if any(
++        cls.__name__ in {"MHATokenToKVPool", "MLATokenToKVPool"}
++        for cls in type(kvcache).__mro__
++    ):
++        # Native MHA/MLA descriptors already use bytes per allocator page.
+         # Supplying them as token strides would multiply page_size twice.
+         return [
+             PoolLayout(
