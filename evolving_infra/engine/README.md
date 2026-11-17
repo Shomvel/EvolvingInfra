@@ -40,10 +40,12 @@ ones. The main changes:
 
 ## Symmetric KV registration
 
-Native MHA and MLA buffer descriptors report bytes per allocator page.
-Symmetric P/D registers those values as explicit page strides, so each read
-addresses page `p` at `base + p * page_nbytes` and copies one page's bytes.
-This applies to MHA subclasses that retain the native descriptor layout.
+Every KV cache reports `kv_item_lens` in bytes per allocator page: MHA, MLA
+and the pools that wrap them (hybrid linear, SWA, MiniMax sparse). Symmetric
+P/D registers those values as page strides, so each read addresses page `p`
+at `base + p * page_nbytes` and copies one page's bytes, the same address the
+Mooncake push path computes. DSA and DeepSeek-V4 register explicit per-pool
+layouts with the same per-page strides.
 
 ## Naming
 

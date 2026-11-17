@@ -49,14 +49,24 @@ def native():
 
 
 @pytest.mark.parametrize("page_size", [1, 4, 64, 128])
-@pytest.mark.parametrize("subclass", [False, True])
+@pytest.mark.parametrize("pool_classes", [
+    ("MHATokenToKVPool",),
+    ("MHATokenToKVPool", "MHATokenToKVPoolFP4"),
+    ("MLATokenToKVPool",),
+    # Wrappers whose get_contiguous_buf_infos returns their inner pool's values.
+    ("HybridLinearKVPool",),
+    ("SWAKVPool",),
+    ("MiniMaxSparseKVPool",),
+], ids=lambda names: names[-1])
 @pytest.mark.parametrize(("source_pages", "target_pages"), [
     ([1], [8]), ([1, 2, 4, 5], [5, 6, 1, 2]), ([8, 3], [1, 7]),
 ])
-def test_mha_registration_copies_pages_within_the_registered_span(
-        native, page_size, subclass, source_pages, target_pages):
-    mha = type("MHATokenToKVPool", (), {})
-    pool = (type("MHATokenToKVPoolFP4", (mha,), {}) if subclass else mha)()
+def test_registration_copies_pages_within_the_registered_span(
+        native, page_size, pool_classes, source_pages, target_pages):
+    cls = object
+    for name in pool_classes:
+        cls = type(name, (cls,), {})
+    pool = cls()
     row_bytes, size = 2, 8 * page_size
     descriptor = native.KvBufferDesc("k", (size + page_size, 1), row_bytes=row_bytes, tokens_per_row=1)
     span = descriptor.final_span_bytes(size, page_size)
