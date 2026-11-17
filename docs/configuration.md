@@ -208,7 +208,9 @@ holds what it cannot detect.
 
 Both argument lists accept `--name=value` and separate tokens such as
 `[--page-size, '64']`. A child option replaces the base option together with all
-of its value tokens. Other options and their values keep their order.
+of its value tokens. Other options and their values keep their order. A value
+in either form that names a file relative to the current directory is passed as
+that file's full path, because the processes run in the work directory.
 
 `examples/slurm/submit.py` also reads `benchmarks` (a map of name to replay: `workload`,
 `concurrency`, `duration`, `warmup`, `prefill_workers`; `processes` and `shards` for several

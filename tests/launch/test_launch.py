@@ -181,3 +181,15 @@ def test_config_overrides_survive_multiple_inheritance_levels(tmp_path):
     top = tmp_path / "top.yaml"
     top.write_text("base: middle.yaml\nengine_args: [--size, '256']\n")
     assert config(parse(["serve", "--config", str(top)]))["engine_args"] == ["--keep", "--size", "256"]
+
+
+@pytest.mark.parametrize("key", ["engine_args", "router_args"])
+def test_relative_file_values_get_full_paths_in_both_option_forms(tmp_path, monkeypatch, key):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.json").write_text("{}")
+    (tmp_path / "b.json").write_text("{}")
+    (tmp_path / "top.yaml").write_text(
+        f"model: /m\n{key}: [--first=a.json, --second, b.json, --name, missing.json, --size, '64']\n")
+    assert config(parse(["serve", "--config", "top.yaml"]))[key] == [
+        f"--first={tmp_path / 'a.json'}", "--second", str(tmp_path / "b.json"),
+        "--name", "missing.json", "--size", "64"]
