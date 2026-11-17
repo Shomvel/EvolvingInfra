@@ -159,6 +159,42 @@ def test_protocol_checks_the_candidates():
         ForwardPD.model_validate(plain)
 
 
+@pytest.mark.parametrize(("field", "invalid", "k", "index"), [
+    ("transfer_id", False, 1, 0),
+    ("transfer_id", True, 1, 0),
+    ("transfer_id", 1.0, 1, 0),
+    ("prefill_k", True, 1, 0),
+    ("prefill_k", 2.0, 2, 0),
+    ("k", True, 1, 0),
+    ("k", 2.0, 2, 0),
+    ("cand_idx", False, 1, 0),
+    ("cand_idx", True, 2, 1),
+    ("cand_idx", 0.0, 1, 0),
+])
+def test_late_d_rejects_noninteger_identifiers_before_consuming_input(field, invalid, k, index):
+    async def scenario():
+        async with harness([None] * k) as (service, api, base, seen, events):
+            info = (await api.post("/prepare", json=body(stream=True))).json()
+            request = late_plan(info, base, k)
+            # Transfer 0/1 makes bool and float values numerically equal.
+            transfer = 0 if invalid is False else 1
+            request["transfer_id"] = transfer
+            request["prefill"]["kv_export"]["transfer_id"] = transfer
+            request["decode"]["kv_import"] = {**request["decode"]["kv_import"], "transfer_id": transfer}
+            for candidate in request["decode_candidates"]:
+                candidate["kv_import"]["transfer_id"] = transfer
+            if field == "transfer_id":
+                request["decode_candidates"][index]["kv_import"][field] = invalid
+            elif field == "prefill_k":
+                request["prefill"]["late_d"]["k"] = invalid
+            else:
+                request["decode_candidates"][index]["late_d"][field] = invalid
+            response = await api.post("/forward_pd", json=request)
+            assert response.status_code == 400
+            assert info["ref"] in service.store.entries and not seen and not events
+    asyncio.run(scenario())
+
+
 def test_late_d_streams_the_admitted_candidate_and_reports_it():
     async def scenario():
         async with harness([None, winner(), failing(None)]) as (service, api, base, seen, events):

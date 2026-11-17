@@ -157,7 +157,7 @@ class ForwardPD(Release):
         Raises:
             ValueError: A prefill/export or decode/import transfer ID differs.
         """
-        if any(mark.get("transfer_id") != self.transfer_id for mark in
+        if any(type(mark.get("transfer_id")) is not int or mark["transfer_id"] != self.transfer_id for mark in
                (self.prefill.kv_export, self.decode.kv_import)):
             raise ValueError("P/D transfer IDs must match the plan")
         if self.decode_candidates is None:
@@ -172,11 +172,12 @@ class ForwardPD(Release):
             raise ValueError("Late D needs the prefill late_d field and 1..64 candidates")
         if self.decode.kv_session is not None:
             raise ValueError("Late-D decode legs carry no KV session tag")
-        if self.prefill.late_d.get("k") != k:
+        if type(self.prefill.late_d.get("k")) is not int or self.prefill.late_d["k"] != k:
             raise ValueError("late_d.k differs from the candidate count")
         for i, cand in enumerate(self.decode_candidates):
-            if cand.kv_import.get("transfer_id") != self.transfer_id:
+            if type(cand.kv_import.get("transfer_id")) is not int or cand.kv_import["transfer_id"] != self.transfer_id:
                 raise ValueError("Candidate transfer IDs must match the plan")
-            if cand.late_d.get("cand_idx") != i or cand.late_d.get("k") != k:
+            if any(type(cand.late_d.get(key)) is not int or cand.late_d[key] != value
+                   for key, value in (("cand_idx", i), ("k", k))):
                 raise ValueError("Candidate late_d fields must follow the candidate order")
         return self
