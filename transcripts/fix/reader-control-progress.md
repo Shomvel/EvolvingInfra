@@ -1943,3 +1943,290 @@ To https://github.com/<redacted>/EvolvingInfra.git
 branch 'fix/reader-control-progress' set up to track 'origin/fix/reader-control-progress'.
 
 ```
+
+
+# Review and review-fix session excerpts (2026-11-17)
+
+Visible user prompts and assistant messages from the session that reviewed pull requests #26–#29 and pushed the review fixes to all four branches. Tool calls and their output, hidden reasoning, system and local instructions, and transcript-export bookkeeping are omitted. The Linux test host is shown as `<build host>`. Dates are UTC as recorded by the session.
+
+## User — 2026-11-17T05:11:05.241Z
+
+#28 Reject noninteger identifiers in prepared P/D plans
+#27 Replace inherited CLI options together with their values
+#26 Fix MHA page strides in symmetric KV transfers https://github.com/mit-han-lab/EvolvingInfra/pulls review一下26~29 PR
+
+## Assistant — 2026-11-17T05:19:50.383Z
+
+Still fetching the repo (the clone is slow), so for now I'm pulling the PR diffs straight from the API.
+
+## Assistant — 2026-11-17T05:23:00.405Z
+
+Got the PR branches; now reading the MHA pool subclasses for #26.
+
+## Assistant — 2026-11-17T05:28:38.419Z
+
+PR #27 is read; on to #28 while the full checkout downloads.
+
+## Assistant — 2026-11-17T05:29:27.600Z
+
+The full fetch is crawling, so I'll pull just the files I need from the partial clone.
+
+## Assistant — 2026-11-17T05:31:19.385Z
+
+Checking whether the scheduler's abort path really waits for an in-flight lookup before reusing pages (#29's main safety claim).
+
+## Assistant — 2026-11-17T05:33:13.018Z
+
+#29 checks out so far. Back to #26: checking which pool types still fall through to the default (double-multiplying) layout.
+
+## Assistant — 2026-11-17T05:36:51.043Z
+
+Found a likely gap in #26 (wrapper pools still double-multiply). Checking whether those pool types are allowed in symmetric P/D at all.
+
+## Assistant — 2026-11-17T05:38:12.798Z
+
+#26 analysis done. Now finishing #27: checking for other users of the removed `_flag` helper and other places that merge arguments.
+
+## Assistant — 2026-11-17T05:39:16.134Z
+
+#27 looks correct; one doc-related gap noted. Now checking #28's `ForwardPD` model for missed fields.
+
+## Assistant — 2026-11-17T05:41:37.609Z
+
+## 结论
+
+我只读了代码，没在本地跑测试：这台机器拉 GitHub 很慢，只取了相关文件。四个 PR 的核心改动都是对的，没有阻塞合并的错误。不过 #26 和 #28 都只修了同一类问题的一部分，建议在合并前补上。
+
+| PR | 结论 | 问题 |
+|---|---|---|
+| #26 MHA page stride | 目标场景正确，修法不完整 | 1 个中等 |
+| #27 CLI 参数覆盖 | 可合并 | 1 个低（文档） |
+| #28 整数 ID 校验 | 可合并，但同类遗漏 | 1 个中等 |
+| #29 reader 控制面响应 | 可合并 | 无阻塞问题，2 点备注 |
+
+## #26 Fix MHA page strides
+
+**问题（中等）：按类名匹配只修了 MHA 子类，包了一层 MHA 的池子仍会把 page_size 多乘一次。**
+- `registration_pools_for` 按 `type(kvcache).__mro__` 里有没有 `MHATokenToKVPool` / `MLATokenToKVPool` 来判断。
+- 下面几个池子本身不是 MHA 子类，但 `get_contiguous_buf_infos()` 直接转给内部的 MHA 池，拿到的也是每页字节数（`memory_pool.py:3918`、`:5273`，`swa_memory_pool.py:174`）。它们会落到默认分支，触发 `_pool_region_from_layout` 里的 `kv_item_lens[e] * page_size`，读到注册区之外，跟这次修的错误一模一样：
+  - `HybridLinearKVPool`（Qwen3-Next 这类 GDN 混合模型）
+  - `SWAKVPool`
+  - `MiniMaxSparseKVPool`
+- 生产代码里只有 `symmetric/planes.py` 调用 `Registration.from_kv_args`。PR 合并后，没有任何原生池子适合走那个默认分支。
+- 建议二选一：
+  - 让默认分支也按每页字节处理；
+  - 或者遇到不认识的 kvcache 类型直接报错，不要静默按每 token 步长处理。
+- 同时更新 `from_kv_args` 文档里"plain MHA/MLA"的说法。
+- 这些模型目前在 symmetric 模式下是否本来就跑不通（比如 SWA 池对非 DSv4 模型从未注册），我没确认。但没有任何地方拦截它们，所以出错时不会报错，而是悄悄读错。
+
+**备注：**
+- 新测试用 `pytest.importorskip("msgspec")`。CI 里的 msgspec 是 `ai-dynamo` 间接带进来的，以后这个依赖一变，24 个回归用例会被静默跳过。#29 已经把 msgspec 显式加进了 test extra，建议合并顺序是 #29 先或者一起合。
+- #29 的 GPU smoke 依赖的"MHA page-stride compatibility patch"就是本 PR。
+
+## #27 Replace inherited CLI options
+
+逻辑正确，测试覆盖了拆开写、`=` 写法、多值、负数、短选项和多层 `base`。
+
+**问题（低）：** 新文档说两种参数列表都接受 `[--page-size, '64']` 这种拆开写法。但 `absolute()`（`launch/__main__.py`）只把 `--name=value` 形式里的相对文件路径转成绝对路径。拆开写的相对文件路径不会被转换，而进程是在工作目录里运行的，路径会失效。这是原有限制，但新文档让它看起来已经支持了。建议让 `absolute()` 也按 `_argument_groups` 分组处理，或者在文档里注明。
+
+**小边界（不必改）：** 以 `--` 开头的值，或者形如 `-Inf` 的值，会被当成选项。这类配置里基本不会出现。
+
+## #28 Reject noninteger identifiers
+
+已加的检查是对的。
+
+**问题（中等）：同一类字段还漏了 `prefill.late_d.default_idx` 和 `router_epoch`。**
+- 引擎在 `late_d.py:461-507` 用 `_uint_below` 严格校验了 `v`、`mode`、`router_epoch`、`k`、`default_idx`、`cand_idx`。
+- 前端只补了 `k` 和 `cand_idx`。
+- 所以 `default_idx: true`、`default_idx: 1.0`、`default_idx >= k`，或者 `router_epoch: 1.0`，都能通过前端，消耗掉只能用一次的 prepared input（`Store.take`），然后才被引擎返回 400。
+- 这正好违背了 PR 里"非法请求返回 400 前不消耗输入、修正后可以复用同一个 prepared ref"的承诺。
+- 建议按引擎的规则在前端一起校验：
+  - `default_idx` 必须在 `[0,k)` 内，且 `local_ok` 时允许 254；
+  - `router_epoch` 必须在 `[0,2^32)` 内；
+  - `v` 必须是整数。
+- 再加对应的参数化用例。
+
+## #29 Keep pull reader controls responsive
+
+**看过没发现问题的部分：**
+- `inflight` 在 `_on_chunk` 里提交任务前就加一，覆盖了排队、查页、READ 全过程。所以 `abort_import` 的 `finished.wait` 和 `_finish_pending` 都会等查页结束，之后调度器才释放页面。
+- 查页前后各检查一次 `pending_terminal`。
+- 失败路径的 `_fail` 和 `_read_finished` 原本就在传输线程上调用，`_send` 走队列，没有 ZMQ 跨线程问题。
+- `_dst_pages_fn` 里的 `torch.cuda.device` 和 `current_stream` 都是线程本地的；`pool_pages_for_range` 只读分配器、行表和代际信息，多个查页并发执行是安全的。
+
+**备注（非阻塞）：**
+1. 等 CUDA 的查页现在占用的是传输线程（默认 4 个），不再是 socket 线程。4 个查页同时卡住时，其他请求的 READ 会排队。PR 没有声称吞吐提升，但值得在饱和负载下做一次 A/B 对比。
+2. phase 从 `io.dst_pages` 改名为 `xfer.dst_pages`。如果有看板或分析脚本按旧名统计，需要同步修改。
+
+---
+
+这几个 PR 都是你的，我可以直接在各自分支上修 #26 和 #28，或者把以上意见作为 PR 评论贴上去。你选哪种？
+
+## User — 2026-11-17T05:42:05.913Z
+
+把这些都修了吧
+
+## Assistant — 2026-11-17T05:42:52.785Z
+
+I'll set up a working checkout. First checking whether <build host> already has an EvolvingInfra clone (better GitHub connectivity than this Mac).
+
+## Assistant — 2026-11-17T05:43:34.145Z
+
+<build host> has fast GitHub access and the original PR working dirs. Inspecting them.
+
+## Assistant — 2026-11-17T05:44:54.634Z
+
+Local worktrees for all four branches exist and are clean. Verifying they match the PR heads.
+
+## Assistant — 2026-11-17T05:45:30.990Z
+
+All four match. Reading the repo's contributor rules before editing.
+
+## Assistant — 2026-11-17T05:49:13.682Z
+
+Confirmed: the Mooncake push path addresses `ptr + page_index * item_len`, so `kv_item_lens` is bytes per page for every model. Now editing #26 to fix the default stride.
+
+## Assistant — 2026-11-17T05:51:00.462Z
+
+Now extending the #26 regression test to cover the wrapper pools and MLA.
+
+## Assistant — 2026-11-17T05:52:26.620Z
+
+Fixed version passes (86). Now showing the new test fails on the current PR head and on the base for the expected reason.
+
+## Assistant — 2026-11-17T05:52:59.326Z
+
+Readable test IDs would help; adding them, then re-running the comparison with summaries.
+
+## Assistant — 2026-11-17T05:53:40.898Z
+
+#26 committed. Now #27: reading the launch guide, then making `absolute()` handle the split form.
+
+## Assistant — 2026-11-17T05:55:06.583Z
+
+Implementing the split-form path resolution in `absolute()`.
+
+## Assistant — 2026-11-17T05:55:47.062Z
+
+Reflowing that docstring and updating the launch guide's `base:` bullet.
+
+## Assistant — 2026-11-17T05:57:30.021Z
+
+The head-comparison printed nothing, which suggests the venv may import `evolving_infra` from a different checkout. Checking.
+
+## Assistant — 2026-11-17T05:58:51.620Z
+
+On the PR head, the split-form value stays relative (`b.json`) as expected; with the fix all 38 launch tests pass. Committing #27.
+
+## Assistant — 2026-11-17T05:59:23.587Z
+
+#27 committed. Now #28: checking which `late_d` fields the router actually sends on each leg.
+
+## Assistant — 2026-11-17T06:01:07.814Z
+
+Now writing the frontend checks.
+
+## Assistant — 2026-11-17T06:01:59.975Z
+
+Updating the validator docstring, then adding the regression test.
+
+## Assistant — 2026-11-17T06:04:42.545Z
+
+#28 committed. For #29, the actionable note is the `io.dst_pages` → `xfer.dst_pages` rename. Searching for stale references to the old name.
+
+## Assistant — 2026-11-17T06:05:49.593Z
+
+`io.dst_pages` was the only `io.*` phase, so after #29 the phase-timer docs describe a phase family that no longer exists. Fixing that line.
+
+## Assistant — 2026-11-17T06:06:43.353Z
+
+All four branches are committed locally. Now running the CI-equivalent checks on Linux (<build host>), as the original PRs did. Checking the <build host> toolchain first.
+
+## Assistant — 2026-11-17T06:07:18.196Z
+
+<build host> has `uv`. I'll ship each branch as a `git archive` into a fresh directory and run the CI commands from a standalone script.
+
+## Assistant — 2026-11-17T06:10:24.207Z
+
+Running the four suites one after another on <build host> (some tests bind fixed local ports, so not in parallel).
+
+## Assistant — 2026-11-17T06:11:37.208Z
+
+While <build host> runs, I'll pull the current PR descriptions to update them.
+
+## Assistant — 2026-11-17T06:11:52.610Z
+
+Drafting the updated #26 description (the <build host> numbers get filled in when the run finishes).
+
+## Assistant — 2026-11-17T06:12:22.832Z
+
+Now #27's description.
+
+## Assistant — 2026-11-17T06:14:34.934Z
+
+The <build host> CI runs finished; checking results.
+
+## Assistant — 2026-11-17T06:14:49.161Z
+
+All four pass on Linux. Confirming the single warning is the existing aiohttp one, then filling in the descriptions.
+
+## Assistant — 2026-11-17T06:15:14.326Z
+
+Trailing `**` left over after the substitution; fixing.
+
+## Assistant — 2026-11-17T06:15:28.969Z
+
+Updating the #28 Details/Transcript lines and the #29 description.
+
+## Assistant — 2026-11-17T06:16:16.747Z
+
+Descriptions are ready. Pushing the four branches to the fork (the Mac's GitHub link is slow, but these pushes are small).
+
+## Assistant — 2026-11-17T06:16:26.996Z
+
+zsh doesn't word-split like bash; using explicit arguments.
+
+## Assistant — 2026-11-17T06:16:46.151Z
+
+Pushed. Updating the PR descriptions; #26's title becomes "Fix KV page strides in symmetric registration" because the fix now covers more than MHA.
+
+## Assistant — 2026-11-17T06:17:59.491Z
+
+Everything is updated. Saving a short memory note about this project's PR workflow for future sessions.
+
+## Assistant — 2026-11-17T06:18:39.423Z
+
+我修了评审里提到的全部问题。四个 PR 都推送了新提交并更新了 PR 描述；完整 CI 测试在 <build host>（Linux, Python 3.12）上四个都通过了。修复都没有上 GPU 跑过。
+
+| PR | 新 head | 改动 | Linux 全量测试 |
+|---|---|---|---|
+| [#26](https://github.com/mit-han-lab/EvolvingInfra/pull/26) | `0f26309` | 从根上修 stride，标题改为 "Fix KV page strides in symmetric registration" | 520 passed, 6 skipped |
+| [#27](https://github.com/mit-han-lab/EvolvingInfra/pull/27) | `08c244d` | `absolute()` 支持拆开写的参数 | 469 passed, 6 skipped |
+| [#28](https://github.com/mit-han-lab/EvolvingInfra/pull/28) | `0fbd90e` | 补齐 late-D 字段校验，标题同步修改 | 476 passed, 6 skipped |
+| [#29](https://github.com/mit-han-lab/EvolvingInfra/pull/29) | `7b00c97` | 修正过时的 phase 文档 | 452 passed, 6 skipped |
+
+四个分支的 `check_agent_files` 和 `uv lock --check` 也都通过。唯一的 warning 是测试里原有的 aiohttp AppKey 提示。
+
+**#26：** 我确认过，代码里每个 KV 池报告的 `kv_item_lens` 都是"每页字节数"，Mooncake 推送路径也按 `ptr + page_index * item_len` 取地址。所以真正出错的地方是注册时的默认步长又乘了一次 `page_size`。
+- 改成直接用 `kv_item_lens` 作为步长，并删掉了按类名判断 MHA/MLA 的分支。这样 `HybridLinearKVPool`、`SWAKVPool`、`MiniMaxSparseKVPool` 这些包装池也一起修好了。
+- 回归测试扩到 6 种池 × 4 种页大小，共 72 个用例。在 base 上挂 45 个；在 PR 原来的提交上挂 27 个，全是包装池，例如页大小 64 时读 16384 字节，应为 256；修复后全部通过。
+
+**#27：** `absolute()` 现在按选项分组处理，`--name value` 写法里的相对文件路径也会转成绝对路径。新测试在原提交上失败，修复后通过。同时更新了 `docs/configuration.md`、launch 的 `AGENTS.md` 和 `load()` 的说明。
+
+**#28：** 前端现在和引擎、SDK 用同一套规则，下面这些情况在消耗只能用一次的 prepared input 之前就返回 400：
+- `default_idx` 必须在 `[0,k)` 内；
+- `router_epoch` 必须在 `[0,2^32)` 内；
+- `v` 必须是整数，`mode` 必须是字符串；
+- prepared plan 里 `local_ok` 必须不传或为 false；
+- 每个候选 D 的 `v`/`mode`/`router_epoch` 必须和 P 的值、类型都一致。
+
+新增的 12 个用例在原提交上全部失败，修复后通过。
+
+**#29：** 代码本身没问题。只修了 phase timer 文档：`io.dst_pages` 原来是唯一的 `io.*` phase，改名后那段说明已经过时。
+
+**还没做的：**
+- 新的修复都没上 GPU 跑。#26 PR 描述里记的 GPU 测试是更早的 MHA 版本；hybrid、SWA、MiniMax 模型在 symmetric 模式下也没测过。
+- #29 中，多个查页同时卡在等 CUDA 时，传输线程会被占满；这对 READ 并发的影响需要 GPU A/B 才能测，PR 描述里已注明没测。
+- 这次修复所在会话的 transcript 还没发布到 fork 的 `agent-logs` 分支。仓库的 check-pr 规则要求先由你确认再发布，三个 PR 描述里都注明了这一点。需要的话我来打码整理并发布。
+
+<build host> 上的测试日志在 `<build-host evidence dir>`。
