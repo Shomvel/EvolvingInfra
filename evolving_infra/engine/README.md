@@ -38,6 +38,13 @@ ones. The main changes:
 - **Model support**: DeepSeek-V4 attention and memory layout, plus speculative decoding and
   multimodal fixes for the tested models.
 
+## Symmetric KV registration
+
+Native MHA and MLA buffer descriptors report bytes per allocator page.
+Symmetric P/D registers those values as explicit page strides, so each read
+addresses page `p` at `base + p * page_nbytes` and copies one page's bytes.
+This applies to MHA subclasses that retain the native descriptor layout.
+
 ## Naming
 
 The Python package is `decoupled_engine` (SGLang's `sglang`, with `srt/` and

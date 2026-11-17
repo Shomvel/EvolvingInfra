@@ -213,8 +213,8 @@ def registration_pools_for(
 ) -> Tuple[Optional[List[PoolLayout]], Dict[str, PoolRegion]]:
     """(pool_layouts for Registration.from_kv_args, extra page pools) of this
     rank's KVArgs. DSA shares one page index space for MLA KV and indexer
-    bytes (including draft layers); both ride in the "full" pool. Other
-    non-DSv4 models keep the default layout. DSv4:
+    bytes (including draft layers); both ride in the "full" pool. Native
+    MHA/MLA buffers provide explicit per-page byte strides. DSv4:
 
     kv_data_ptrs (get_contiguous_buf_infos) is ordered [c4 kv x c4_layer_num,
     c4 indexer x c4_layer_num, c128 kv x c128_layer_num] and every entry is a
@@ -241,8 +241,11 @@ def registration_pools_for(
                 + list(kv_args.state_item_lens[i]),
             )
         }
-    if any(cls.__name__ == "MLATokenToKVPool" for cls in type(kvcache).__mro__):
-        # Native MLA buffer descriptors already use bytes per allocator page.
+    if any(
+        cls.__name__ in {"MHATokenToKVPool", "MLATokenToKVPool"}
+        for cls in type(kvcache).__mro__
+    ):
+        # Native MHA/MLA descriptors already use bytes per allocator page.
         # Supplying them as token strides would multiply page_size twice.
         return [
             PoolLayout(
