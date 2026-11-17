@@ -195,6 +195,40 @@ def test_late_d_rejects_noninteger_identifiers_before_consuming_input(field, inv
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize(("legs", "key", "invalid"), [
+    ("prefill", "default_idx", True),
+    ("prefill", "default_idx", 1.0),
+    ("prefill", "default_idx", 2),
+    ("prefill", "default_idx", -1),
+    ("prefill", "local_ok", True),
+    ("all", "router_epoch", 9.0),
+    ("all", "router_epoch", 2**32),
+    ("all", "v", True),
+    ("all", "mode", 1),
+    ("candidate", "router_epoch", 8),
+    ("candidate", "router_epoch", 9.0),
+    ("candidate", "v", None),
+])
+def test_late_d_rejects_malformed_link_fields_before_consuming_input(legs, key, invalid):
+    async def scenario():
+        async with harness([None, None]) as (service, api, base, seen, events):
+            info = (await api.post("/prepare", json=body(stream=True))).json()
+            request = late_plan(info, base, 2, default_idx=1)
+            fields = {"prefill": [request["prefill"]["late_d"]],
+                      "candidate": [request["decode_candidates"][1]["late_d"]],
+                      "all": [request["prefill"]["late_d"],
+                              *(c["late_d"] for c in request["decode_candidates"])]}[legs]
+            for field in fields:
+                if invalid is None:
+                    field.pop(key)
+                else:
+                    field[key] = invalid
+            response = await api.post("/forward_pd", json=request)
+            assert response.status_code == 400
+            assert info["ref"] in service.store.entries and not seen and not events
+    asyncio.run(scenario())
+
+
 def test_late_d_streams_the_admitted_candidate_and_reports_it():
     async def scenario():
         async with harness([None, winner(), failing(None)]) as (service, api, base, seen, events):
